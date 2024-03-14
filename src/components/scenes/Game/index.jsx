@@ -1,57 +1,34 @@
 import {Environment, OrbitControls} from "@react-three/drei";
 import MapModel from "../../models/Map.jsx";
 import {useEffect, useState} from "react";
-import {insertCoin, Joystick, onPlayerJoin} from "playroomkit";
+import {insertCoin, Joystick, myPlayer, onPlayerJoin} from "playroomkit";
+import {CharacterController} from "../CharacterController/index.jsx";
+import {RigidBody} from "@react-three/rapier";
 
 const GameScene = () => {
-    const [players, setPlayers] = useState([])
-    const [playerPosition, setPlayerPosition] = useState([0, 0, 0]);
-
+    const [players, setPlayers] = useState([]);
     const start = async () => {
         await insertCoin();
-    }
-    useEffect(() => {
-        start();
-
-        const handleKeyDown = (event) => {
-            const speed = 0.1; // Ajustez la vitesse du déplacement selon vos besoins
-            const {key} = event;
-
-            switch (key) {
-                case "ArrowUp":
-                    setPlayerPosition((prevPos) => [prevPos[0], prevPos[1], prevPos[2] - speed]);
-                    break;
-                case "ArrowDown":
-                    setPlayerPosition((prevPos) => [prevPos[0], prevPos[1], prevPos[2] + speed]);
-                    break;
-                case "ArrowLeft":
-                    setPlayerPosition((prevPos) => [prevPos[0] - speed, prevPos[1], prevPos[2]]);
-                    break;
-                case "ArrowRight":
-                    setPlayerPosition((prevPos) => [prevPos[0] + speed, prevPos[1], prevPos[2]]);
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        window.addEventListener("keydown", handleKeyDown);
 
         onPlayerJoin((state) => {
-            const newPlayer = {state};
+
+            const joystick = new Joystick(state, {
+                type: "angular",
+                buttons: [{id: "fire", label: "Fire"}],
+            });
+            const newPlayer = {state, joystick};
             state.setState("health", 100);
             state.setState("deaths", 0);
             state.setState("kills", 0);
             setPlayers((players) => [...players, newPlayer]);
-
             state.onQuit(() => {
                 setPlayers((players) => players.filter((p) => p.state.id !== state.id));
             });
         });
+    };
 
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-        };
+    useEffect(() => {
+        start();
     }, []);
     return (
         <>
@@ -69,7 +46,17 @@ const GameScene = () => {
                     shadow-camera-bottom={-25}
                     shadow-mapSize={[1024, 1024]}
                 />
-                <MapModel/>
+                <RigidBody colliders="trimesh" type="fixed">
+                    <MapModel/>
+                </RigidBody>
+                {players.map(({state, joystick}, index) => (
+                    <CharacterController
+                        key={state.id}
+                        state={state}
+                        userPlayer={state.id === myPlayer()?.id}
+                        joystick={joystick}
+                    />
+                ))}
             </group>
         </>
     )
